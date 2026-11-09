@@ -1,0 +1,35 @@
+services:
+  personal-agent:
+    build: .
+    image: personal-agent:local
+    restart: unless-stopped
+    env_file:
+      - ${RUNTIME_DIR:-./runtime}/app.env
+    volumes:
+      - ${RUNTIME_DIR:-./runtime}/pi-agent:/app/runtime/pi-agent
+      - ${RUNTIME_DIR:-./runtime}/workspace:/app/runtime/workspace
+    expose:
+      - "3000"
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:3000/healthz').then(r=>{if(!r.ok)process.exit(1)}).catch(()=>process.exit(1))"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 20s
+    networks:
+      - agent
+
+  cloudflared:
+    image: cloudflare/cloudflared:2026.10.0
+    restart: unless-stopped
+    command: tunnel --no-autoupdate run
+    env_file:
+      - ${RUNTIME_DIR:-./runtime}/cloudflared.env
+    depends_on:
+      personal-agent:
+        condition: service_healthy
+    networks:
+      - agent
+
+networks:
+  agent:
