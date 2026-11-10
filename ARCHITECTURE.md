@@ -278,6 +278,13 @@ The Dockerfile uses two stages:
 1. Node 22 build stage installs the lockfile and compiles client/server;
 2. Node 22 slim runtime installs production dependencies and runs as the non-root `node` user.
 
+A push to `main` builds `linux/amd64` in GitHub Actions and publishes the private
+`ghcr.io/nhanchau2409/personal-agent:main` image. A failed image build prevents
+deployment. The restricted CI SSH key can invoke only the root-owned deployment
+command, which pulls the image, recreates the application container, checks its
+health, and logs out of GHCR. Hetzner does not build application source after
+the CI transition.
+
 ### Compose
 
 ```text
@@ -337,9 +344,10 @@ Cloudflared receives `TUNNEL_TOKEN` through its separate runtime environment fil
 - DNS record;
 - Google identity provider where safely representable;
 - Access application and exact-email policy;
-- Hetzner server and SSH-only firewall.
+- Hetzner server and SSH-only firewall;
+- GitHub Actions variables, secrets, CI key, and restricted deployment bootstrap.
 
-No inbound HTTP/HTTPS firewall rules are needed. Infrastructure changes are planned and validated with OpenTofu, then applied only by the owner.
+No inbound HTTP/HTTPS firewall rules are needed. Infrastructure changes are planned and validated with OpenTofu, then applied only by the owner. GHCR package visibility is outside the GitHub provider; the initial package remains private by default.
 
 ## 15. Operations from macOS
 
@@ -369,7 +377,7 @@ Database, queues, schedulers, and additional channels are deferred until their r
 
 ## 17. Validation gates
 
-Before deployment:
+Before the CI transition:
 
 ```bash
 npm run check
@@ -377,6 +385,8 @@ npm run build
 npm audit --omit=dev
 docker build .
 ```
+
+After the transition, the push workflow's Docker build is the deployment gate. Production pulls the resulting GHCR image rather than compiling on the VM.
 
 End-to-end acceptance:
 

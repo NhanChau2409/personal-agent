@@ -7,6 +7,7 @@ COPY . .
 RUN npm run build
 
 FROM node:22-bookworm-slim AS runtime
+LABEL org.opencontainers.image.source="https://github.com/NhanChau2409/personal-agent"
 ENV NODE_ENV=production
 WORKDIR /app
 COPY package.json package-lock.json ./

@@ -80,13 +80,30 @@ PI_CODING_AGENT_DIR=/app/runtime/pi-agent
 
 `PI_AGENT_DIR` is consumed by this application. `PI_CODING_AGENT_DIR` is consumed by the Pi CLI during login. Never commit `auth.json`, copy it into an image, or print it.
 
-## Operate
+## Delivery
+
+A push to `main` builds `linux/amd64`, publishes the private image
+`ghcr.io/nhanchau2409/personal-agent:main`, and deploys it through a restricted
+CI-only SSH key. A failed image build stops the workflow before deployment.
+Hetzner pulls the image and recreates only the application container; runtime
+credentials and workspace data remain in host bind mounts.
+
+The GitHub Actions secret and variables are managed by `infra/github` in the
+separate infrastructure repository. New GHCR packages default to private.
+
+For a local image build with OrbStack:
 
 ```bash
-docker compose build
-docker compose up -d
-docker compose ps
-docker compose logs --tail=100 personal-agent
+docker compose -f compose.yaml -f compose.local.yaml build personal-agent
 ```
 
-Deployment and live infrastructure changes are owner-operated. Agents may validate and plan but must not apply them.
+Production operations on Hetzner:
+
+```bash
+RUNTIME_DIR=/srv/apps/personal-agent/runtime docker compose pull personal-agent
+RUNTIME_DIR=/srv/apps/personal-agent/runtime docker compose up -d --no-deps personal-agent
+RUNTIME_DIR=/srv/apps/personal-agent/runtime docker compose ps
+RUNTIME_DIR=/srv/apps/personal-agent/runtime docker compose logs --tail=100 personal-agent
+```
+
+Deployment and live infrastructure changes are owner-operated. Agents may validate and plan but must not apply them or push deployment-triggering commits.

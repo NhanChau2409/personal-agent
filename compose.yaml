@@ -1,7 +1,6 @@
 services:
   personal-agent:
-    build: .
-    image: personal-agent:local
+    image: ghcr.io/nhanchau2409/personal-agent:main
     restart: unless-stopped
     env_file:
       - ${RUNTIME_DIR:-./runtime}/app.env
