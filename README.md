@@ -80,6 +80,16 @@ PI_CODING_AGENT_DIR=/app/runtime/pi-agent
 
 `PI_AGENT_DIR` is consumed by this application. `PI_CODING_AGENT_DIR` is consumed by the Pi CLI during login. Never commit `auth.json`, copy it into an image, or print it.
 
+## Google Tasks and Brave Search (optional)
+
+The app has a combined Google Tasks panel (desktop sidebar, iPhone sheet). The agent uses the same Tasks service through three narrow tools: read, create and update. Task changes are immediate; no bulk plan or reordering tool is exposed. The panel polls for changes every 60 seconds while visible. Calendar, Drive, chat synchronization and Daily/Effort mode controls are **not** included yet.
+
+Create a **new Google OAuth web client** for Tasks (do not reuse Cloudflare Access's login client). Set the authorized redirect URI to `https://agent.nhanchau.com/api/google/callback`; configure the OAuth consent screen with the Google Tasks API enabled and the `https://www.googleapis.com/auth/tasks` scope. For a testing-mode consent screen add each Google account as a test user; Google may expire testing-mode refresh tokens after 7 days. Publishing an external app with sensitive scopes may require Google verification. Connect each account via **Connect Google account** in the Tasks panel while signed into the app as the owner. This is authorization of data, not a second app login; each account is labeled and writes target the chosen account. Only connect accounts you control or have permission to manage.
+
+Set `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`, and `GOOGLE_TOKEN_KEY` in the private runtime `app.env`. Generate the key with `openssl rand -base64 32` and keep a secure backup: it encrypts the account refresh tokens in the mounted `pi-agent/google-accounts.json`. Do not rotate it without reconnecting accounts. Leave these variables unset to disable the integration. `PUBLIC_ORIGIN` must match the HTTPS hostname. Do not commit or print the credentials or token file.
+
+For Brave web search, obtain a **Brave Search API key** (consumer Brave/YouTube Premium does not include this API), then set `BRAVE_API_KEY` in `app.env`. The app uses Brave's official MCP server with **only** `brave_web_search` exposed to Pi; it never exposes shell or filesystem tools. Without the key search remains disabled.
+
 ## Delivery
 
 A push to `main` builds `linux/amd64`, publishes the private image

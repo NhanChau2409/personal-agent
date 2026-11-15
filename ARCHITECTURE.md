@@ -103,7 +103,7 @@ It does not contact Pi or Codex.
 
 ### `POST /api/agent`
 
-The only agent endpoint. Request and response follow AG-UI 1.0.
+The agent endpoint. Google Tasks endpoints under `/api/google/*` and `/api/tasks*` use the same Access JWT verifier; Google OAuth uses a separate web client and encrypted refresh tokens in the mounted runtime directory. Request and response follow AG-UI 1.0.
 
 Request is validated with `RunAgentInputSchema` and includes:
 
@@ -147,7 +147,7 @@ The server creates one shared `ModelRuntime` at startup using the dedicated serv
 AG-UI run
   ├── create SessionManager.inMemory()
   ├── append previous user/assistant messages
-  ├── create Pi AgentSession with no tools
+  ├── create Pi AgentSession with only approved Tasks / Brave Search tools
   ├── prompt with the newest user message
   ├── translate text_delta → AG-UI TEXT_MESSAGE_CONTENT
   └── dispose AgentSession
@@ -165,7 +165,7 @@ Pi 1.5 makes `SessionManager` authoritative for model context. History is append
 
 ### Message conversion
 
-For the POC, only text user and assistant messages are converted. System, activity, reasoning, tool, image, audio, and file messages are not admitted into Pi history yet. Tools are disabled, so this is a deliberate capability boundary rather than silent partial tool support.
+For the POC, only text user and assistant messages are converted. System, activity, reasoning, tool, image, audio, and file messages are not admitted into Pi history yet. Tool results are not yet rendered in the AG-UI transcript; only approved Tasks tools and optional Brave Search are enabled.
 
 Historical assistant messages receive the configured model metadata and zero usage because the browser does not own provider accounting. New provider messages retain Pi's real metadata internally during the run.
 
@@ -188,11 +188,11 @@ The web process uses a dedicated Pi agent directory and workspace. It does not u
 The session is created with:
 
 ```ts
-noTools: "all"
+tools: ["task_read", "task_create", "task_update", "mcp__brave__brave_web_search"] // when configured
 SessionManager.inMemory()
 ```
 
-It receives a fixed system prompt and no shell, filesystem, infrastructure, extension, MCP, or autonomous tools. The browser cannot configure the model, system prompt, working directory, or tool set.
+It receives a fixed system prompt and no shell, filesystem or infrastructure tools. The only application-authorized tools are Google Tasks read/create/update and (when configured) the official Brave MCP web search. Pi project/user extensions and MCP configurations are not loaded. The browser cannot configure the model, system prompt, working directory, or tool set.
 
 Future personal tools must be explicit typed tools with narrow authority, reviewable input schemas, and human confirmation for side effects.
 

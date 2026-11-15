@@ -22,9 +22,11 @@
     "@assistant-ui/react-ag-ui": "^0.1.2",
     "@assistant-ui/react-markdown": "^0.14.25",
     "@base-ui/react": "^1.9.0",
+    "@brave/brave-search-mcp-server": "^2.1.4",
     "@earendil-works/pi-coding-agent": "1.5.0",
     "@fastify/static": "^10.1.10",
     "@fontsource-variable/geist": "^5.3.0",
+    "@sinclair/typebox": "^0.34.52",
     "@tailwindcss/vite": "^4.3.5",
     "class-variance-authority": "^0.7.1",
     "cn": "^0.5.2",
@@ -39,6 +41,10 @@
     "tw-shimmer": "^0.4.14",
     "zod": "^4.6.7",
     "zustand": "^5.1.0"
+  },
+  "overrides": {
+    "@modelcontextprotocol/sdk": "1.32.2",
+    "zod": "$zod"
   },
   "devDependencies": {
     "@types/node": "^24.10.0",

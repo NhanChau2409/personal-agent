@@ -5,19 +5,22 @@ import Fastify from "fastify";
 import { PiAgUiAdapter } from "./agent.js";
 import { loadConfig } from "./config.js";
 import { registerRoutes } from "./routes.js";
+import { GoogleTasks } from "./google.js";
 
 const config = loadConfig();
 const app = Fastify({
+  disableRequestLogging: true, // OAuth callback URLs contain one-time authorization codes.
   logger: {
     level: config.nodeEnv === "production" ? "info" : "debug",
-    redact: ["req.headers.authorization", "req.headers.cookie", "req.headers.cf-access-jwt-assertion"]
+    redact: ["req.url", "req.headers.authorization", "req.headers.cookie", "req.headers.cf-access-jwt-assertion"]
   },
   bodyLimit: 256 * 1024
 });
-const agent = new PiAgUiAdapter(config);
-
+const google = config.google ? new GoogleTasks(config.google, config.publicOrigin) : undefined;
+const agent = new PiAgUiAdapter(config, google);
+await google?.initialize();
 await agent.initialize();
-await registerRoutes(app, config, agent);
+await registerRoutes(app, config, agent, google);
 
 const serverDir = path.dirname(fileURLToPath(import.meta.url));
 const clientDir = path.resolve(serverDir, "../client");

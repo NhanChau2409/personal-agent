@@ -24,6 +24,11 @@ export function loadConfig() {
     ownerEmail: required("OWNER_EMAIL").toLowerCase()
   } : undefined;
 
+  const googleSettings = ["GOOGLE_CLIENT_ID", "GOOGLE_CLIENT_SECRET", "GOOGLE_TOKEN_KEY"].filter((name) => !!process.env[name]);
+  if (googleSettings.length && googleSettings.length !== 3) {
+    throw new Error("Google Tasks requires GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET and GOOGLE_TOKEN_KEY together");
+  }
+
   return {
     nodeEnv,
     authMode,
@@ -34,6 +39,12 @@ export function loadConfig() {
     piProvider: process.env.PI_PROVIDER ?? "openai-codex",
     piModel: process.env.PI_MODEL ?? "gpt-6.1-sol",
     piThinking: process.env.PI_THINKING ?? "low",
-    workspace: path.resolve(process.env.PI_WORKSPACE ?? "./runtime/workspace")
+    workspace: path.resolve(process.env.PI_WORKSPACE ?? "./runtime/workspace"),
+    google: process.env.GOOGLE_CLIENT_ID && process.env.GOOGLE_CLIENT_SECRET && process.env.GOOGLE_TOKEN_KEY
+      ? { clientId: process.env.GOOGLE_CLIENT_ID, clientSecret: process.env.GOOGLE_CLIENT_SECRET,
+          tokenKey: process.env.GOOGLE_TOKEN_KEY,
+          store: path.resolve(process.env.GOOGLE_TOKEN_STORE ?? "./runtime/pi-agent/google-accounts.json") }
+      : undefined,
+    braveApiKey: process.env.BRAVE_API_KEY || undefined
   };
 }
