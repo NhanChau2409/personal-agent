@@ -103,7 +103,7 @@ It does not contact Pi or Codex.
 
 ### `POST /api/agent`
 
-The agent endpoint. Google Tasks endpoints under `/api/google/*` and `/api/tasks*` use the same Access JWT verifier; Google OAuth uses a separate web client and encrypted refresh tokens in the mounted runtime directory. Request and response follow AG-UI 1.0.
+The agent endpoint. Google Workspace endpoints under `/api/google/*`, `/api/tasks*`, `/api/calendar*`, and `/api/drive*` use the same Access JWT verifier; Google OAuth uses a separate web client and one encrypted account refresh token in the mounted runtime directory. Request and response follow AG-UI 1.0.
 
 Request is validated with `RunAgentInputSchema` and includes:
 
@@ -192,7 +192,7 @@ tools: ["task_read", "task_create", "task_update", "mcp__brave__brave_web_search
 SessionManager.inMemory()
 ```
 
-It receives a fixed system prompt and no shell, filesystem or infrastructure tools. The only application-authorized tools are Google Tasks read/create/update and (when configured) the official Brave MCP web search. Pi project/user extensions and MCP configurations are not loaded. The browser cannot configure the model, system prompt, working directory, or tool set.
+It receives a fixed system prompt and no shell, filesystem or infrastructure tools. The only application-authorized tools are narrow Google Tasks, Calendar, Drive/Docs/Sheets tools and (when configured) the official Brave MCP web search. Pi project/user extensions and MCP configurations are not loaded. The browser cannot configure the model, system prompt, working directory, or tool set.
 
 Future personal tools must be explicit typed tools with narrow authority, reviewable input schemas, and human confirmation for side effects.
 

@@ -121,6 +121,14 @@ body {
 .tasks-account { display: flex; justify-content: space-between; align-items: center; font-size: 0.75rem; gap: 0.4rem; }
 .tasks-account span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .tasks-connect { display: flex; align-items: center; gap: 0.4rem; font-size: 0.8rem; color: #345b4d; padding: 0.5rem 0; text-decoration: none; }
+.workspace-tabs { display: grid; grid-template-columns: repeat(3, 1fr); border-bottom: 1px solid var(--border); padding: 0 0.7rem; }
+.workspace-tabs button { display: flex; justify-content: center; align-items: center; gap: 0.25rem; border: 0; border-bottom: 2px solid transparent; background: none; padding: 0.6rem 0.2rem; font-size: 0.75rem; cursor: pointer; color: #6b706a; }
+.workspace-tabs button.active { color: #345b4d; border-bottom-color: #345b4d; font-weight: 700; }
+.workspace-entry { display: flex; align-items: flex-start; gap: 0.55rem; border-bottom: 1px solid var(--border); padding: 0.7rem 0; font-size: 0.82rem; }
+.workspace-entry div { flex: 1; min-width: 0; }
+.workspace-entry strong { display: block; overflow-wrap: anywhere; }
+.workspace-entry small { display: block; color: #6b706a; margin-top: 0.15rem; }
+.workspace-entry a { color: #345b4d; padding: 0.2rem; }
 .tasks-create { padding: 0.85rem 1rem; border-bottom: 1px solid var(--border); display: grid; gap: 0.5rem; }
 .tasks-create input, .tasks-create select { min-width: 0; border: 1px solid var(--border); background: var(--background); border-radius: 0.55rem; padding: 0.5rem; font: inherit; font-size: 0.8rem; }
 .tasks-create > div { display: flex; gap: 0.3rem; }

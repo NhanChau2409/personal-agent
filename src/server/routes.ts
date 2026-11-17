@@ -58,6 +58,55 @@ export async function registerRoutes(app: FastifyInstance, config: Config, agent
     catch (error) { return reply.code(502).send({ error: (error as Error).message }); }
   });
 
+  app.get("/api/calendar", { preHandler: verifyAccess }, async (request, reply) => {
+    if (!google) return reply.code(503).send({ error: "Google integration is not configured" });
+    const parsed = z.object({ timeMin: z.iso.datetime({ offset: true }), timeMax: z.iso.datetime({ offset: true }) }).safeParse(request.query);
+    if (!parsed.success) return reply.code(400).send({ error: "Invalid calendar range" });
+    try { return reply.header("cache-control", "no-store").send(await google.events(parsed.data.timeMin, parsed.data.timeMax)); }
+    catch (error) { return reply.code(502).send({ error: (error as Error).message }); }
+  });
+  app.post("/api/calendar/events", { preHandler: verifyAccess }, async (request, reply) => {
+    if (!google) return reply.code(503).send({ error: "Google integration is not configured" });
+    const parsed = z.object({ calendarId: z.string().optional(), summary: z.string().trim().min(1).max(1024),
+      start: z.string(), end: z.string(), allDay: z.boolean().optional(), description: z.string().max(8192).optional() }).safeParse(request.body);
+    if (!parsed.success) return reply.code(400).send({ error: "Invalid calendar event" });
+    try { return await google.createEvent(parsed.data); }
+    catch (error) { return reply.code(502).send({ error: (error as Error).message }); }
+  });
+  app.get("/api/drive/files", { preHandler: verifyAccess }, async (request, reply) => {
+    if (!google) return reply.code(503).send({ error: "Google integration is not configured" });
+    const parsed = z.object({ q: z.string().max(200).optional() }).safeParse(request.query);
+    if (!parsed.success) return reply.code(400).send({ error: "Invalid file search" });
+    try { return reply.header("cache-control", "no-store").send({ files: await google.files(parsed.data.q) }); }
+    catch (error) { return reply.code(502).send({ error: (error as Error).message }); }
+  });
+  app.post("/api/drive/documents", { preHandler: verifyAccess }, async (request, reply) => {
+    if (!google) return reply.code(503).send({ error: "Google integration is not configured" });
+    const parsed = z.object({ title: z.string().trim().min(1).max(255) }).safeParse(request.body);
+    if (!parsed.success) return reply.code(400).send({ error: "Invalid document" });
+    try { return await google.createDocument(parsed.data.title); }
+    catch (error) { return reply.code(502).send({ error: (error as Error).message }); }
+  });
+  app.post("/api/drive/sheets", { preHandler: verifyAccess }, async (request, reply) => {
+    if (!google) return reply.code(503).send({ error: "Google integration is not configured" });
+    const parsed = z.object({ title: z.string().trim().min(1).max(255) }).safeParse(request.body);
+    if (!parsed.success) return reply.code(400).send({ error: "Invalid spreadsheet" });
+    try { return await google.createSheet(parsed.data.title); }
+    catch (error) { return reply.code(502).send({ error: (error as Error).message }); }
+  });
+  app.get("/api/drive/documents/:id", { preHandler: verifyAccess }, async (request, reply) => {
+    if (!google) return reply.code(503).send({ error: "Google integration is not configured" });
+    try { return await google.readDocument((request.params as { id: string }).id); }
+    catch (error) { return reply.code(502).send({ error: (error as Error).message }); }
+  });
+  app.get("/api/drive/sheets/:id", { preHandler: verifyAccess }, async (request, reply) => {
+    if (!google) return reply.code(503).send({ error: "Google integration is not configured" });
+    const range = z.object({ range: z.string().max(100).optional() }).safeParse(request.query);
+    if (!range.success) return reply.code(400).send({ error: "Invalid range" });
+    try { return await google.readSheet((request.params as { id: string }).id, range.data.range); }
+    catch (error) { return reply.code(502).send({ error: (error as Error).message }); }
+  });
+
   app.post("/api/agent", { preHandler: verifyAccess }, async (request, reply) => {
     const parsed = RunAgentInputSchema.safeParse(request.body);
     if (!parsed.success) {
