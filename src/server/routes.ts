@@ -36,9 +36,11 @@ export async function registerRoutes(app: FastifyInstance, config: Config, agent
     try { await google.disconnect(id); return { ok: true }; }
     catch { return reply.code(404).send({ error: "Account not found" }); }
   });
-  app.get("/api/tasks", { preHandler: verifyAccess }, async (_request, reply) => {
+  app.get("/api/tasks", { preHandler: verifyAccess }, async (request, reply) => {
     if (!google) return reply.code(503).send({ error: "Google integration is not configured" });
-    return reply.header("cache-control", "no-store").send({ accounts: await google.overview() });
+    const parsed = z.object({ cursor: z.string().max(8192).optional() }).safeParse(request.query);
+    if (!parsed.success) return reply.code(400).send({ error: "Invalid task cursor" });
+    return reply.header("cache-control", "no-store").send(await google.overview(parsed.data.cursor));
   });
   const createTask = z.object({ account: z.string(), list: z.string(), title: z.string().trim().min(1).max(1024), due: z.iso.date().optional() });
   app.post("/api/tasks", { preHandler: verifyAccess }, async (request, reply) => {
@@ -60,9 +62,9 @@ export async function registerRoutes(app: FastifyInstance, config: Config, agent
 
   app.get("/api/calendar", { preHandler: verifyAccess }, async (request, reply) => {
     if (!google) return reply.code(503).send({ error: "Google integration is not configured" });
-    const parsed = z.object({ timeMin: z.iso.datetime({ offset: true }), timeMax: z.iso.datetime({ offset: true }) }).safeParse(request.query);
+    const parsed = z.object({ timeMin: z.iso.datetime({ offset: true }), timeMax: z.iso.datetime({ offset: true }), cursor: z.string().max(8192).optional() }).safeParse(request.query);
     if (!parsed.success) return reply.code(400).send({ error: "Invalid calendar range" });
-    try { return reply.header("cache-control", "no-store").send(await google.events(parsed.data.timeMin, parsed.data.timeMax)); }
+    try { return reply.header("cache-control", "no-store").send(await google.events(parsed.data.timeMin, parsed.data.timeMax, parsed.data.cursor)); }
     catch (error) { return reply.code(502).send({ error: (error as Error).message }); }
   });
   app.post("/api/calendar/events", { preHandler: verifyAccess }, async (request, reply) => {
@@ -75,9 +77,9 @@ export async function registerRoutes(app: FastifyInstance, config: Config, agent
   });
   app.get("/api/drive/files", { preHandler: verifyAccess }, async (request, reply) => {
     if (!google) return reply.code(503).send({ error: "Google integration is not configured" });
-    const parsed = z.object({ q: z.string().max(200).optional() }).safeParse(request.query);
+    const parsed = z.object({ q: z.string().max(200).optional(), cursor: z.string().max(2048).optional() }).safeParse(request.query);
     if (!parsed.success) return reply.code(400).send({ error: "Invalid file search" });
-    try { return reply.header("cache-control", "no-store").send({ files: await google.files(parsed.data.q) }); }
+    try { return reply.header("cache-control", "no-store").send(await google.files(parsed.data.q, parsed.data.cursor)); }
     catch (error) { return reply.code(502).send({ error: (error as Error).message }); }
   });
   app.post("/api/drive/documents", { preHandler: verifyAccess }, async (request, reply) => {

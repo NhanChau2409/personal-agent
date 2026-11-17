@@ -42,6 +42,9 @@ export function Tasks() {
   const [eventStart, setEventStart] = useState("");
   const [eventEnd, setEventEnd] = useState("");
   const [fileTitle, setFileTitle] = useState("");
+  const [taskCursor, setTaskCursor] = useState<string>();
+  const [calendarCursor, setCalendarCursor] = useState<string>();
+  const [fileCursor, setFileCursor] = useState<string>();
   const refresh = useCallback(async () => {
     try {
       const connection = await api<{ configured: boolean; accounts: { id: string; email: string }[] }>("/api/google/accounts");
@@ -50,12 +53,12 @@ export function Tasks() {
         const from = new Date(); from.setDate(from.getDate() - 7);
         const to = new Date(); to.setDate(to.getDate() + 90);
         const [tasks, calendar, drive] = await Promise.all([
-          api<{ accounts: Account[] }>("/api/tasks"),
-          api<{ events: CalendarEvent[] }>(`/api/calendar?timeMin=${encodeURIComponent(from.toISOString())}&timeMax=${encodeURIComponent(to.toISOString())}`),
-          api<{ files: DriveFile[] }>("/api/drive/files")
+          api<{ accounts: Account[]; cursor?: string }>("/api/tasks"),
+          api<{ events: CalendarEvent[]; cursor?: string }>(`/api/calendar?timeMin=${encodeURIComponent(from.toISOString())}&timeMax=${encodeURIComponent(to.toISOString())}`),
+          api<{ files: DriveFile[]; cursor?: string }>("/api/drive/files")
         ]);
-        setAccounts(tasks.accounts); setEvents(calendar.events); setFiles(drive.files);
-      } else { setAccounts([]); setEvents([]); setFiles([]); }
+        setAccounts(tasks.accounts); setTaskCursor(tasks.cursor); setEvents(calendar.events); setCalendarCursor(calendar.cursor); setFiles(drive.files); setFileCursor(drive.cursor);
+      } else { setAccounts([]); setEvents([]); setFiles([]); setTaskCursor(undefined); setCalendarCursor(undefined); setFileCursor(undefined); }
       setError("");
     } catch (e) { setError((e as Error).message); }
     finally { setLoading(false); }
@@ -123,6 +126,27 @@ export function Tasks() {
     try { await api(`/api/drive/${kind}`, { method: "POST", body: JSON.stringify({ title: fileTitle.trim() }) }); setFileTitle(""); await refresh(); }
     catch (e) { setError((e as Error).message); } finally { setBusy(false); }
   }
+  async function loadMoreTasks() {
+    if (!taskCursor) return; setBusy(true);
+    try { const page = await api<{ accounts: Account[]; cursor?: string }>(`/api/tasks?cursor=${encodeURIComponent(taskCursor)}`);
+      setAccounts((current) => current.map((account) => ({ ...account, lists: account.lists.map((list) => {
+        const addition = page.accounts[0]?.lists.find((candidate) => candidate.id === list.id); return addition ? { ...list, tasks: [...list.tasks, ...addition.tasks] } : list;
+      }) }))); setTaskCursor(page.cursor); }
+    catch (e) { setError((e as Error).message); } finally { setBusy(false); }
+  }
+  async function loadMoreCalendar() {
+    if (!calendarCursor) return; setBusy(true);
+    try { const from = new Date(); from.setDate(from.getDate() - 7); const to = new Date(); to.setDate(to.getDate() + 90);
+      const page = await api<{ events: CalendarEvent[]; cursor?: string }>(`/api/calendar?timeMin=${encodeURIComponent(from.toISOString())}&timeMax=${encodeURIComponent(to.toISOString())}&cursor=${encodeURIComponent(calendarCursor)}`);
+      setEvents((current) => [...current, ...page.events]); setCalendarCursor(page.cursor); }
+    catch (e) { setError((e as Error).message); } finally { setBusy(false); }
+  }
+  async function loadMoreFiles() {
+    if (!fileCursor) return; setBusy(true);
+    try { const page = await api<{ files: DriveFile[]; cursor?: string }>(`/api/drive/files?cursor=${encodeURIComponent(fileCursor)}`);
+      setFiles((current) => [...current, ...page.files]); setFileCursor(page.cursor); }
+    catch (e) { setError((e as Error).message); } finally { setBusy(false); }
+  }
   return <>
     <button className="tasks-trigger" onClick={() => setOpen(true)}>Workspace <span>{items.filter((item) => item.status !== "completed").length}</span></button>
     {open && <button className="tasks-backdrop" aria-label="Close tasks" onClick={() => setOpen(false)} />}
@@ -177,6 +201,7 @@ export function Tasks() {
               }}><Pencil size={15} /></button>
             </div>)}
           </section>)}
+          {taskCursor && <button className="workspace-more" disabled={busy} onClick={() => void loadMoreTasks()}>Load 50 more tasks per list</button>}
         </div>}
         {tab === "calendar" && <><form className="tasks-create" onSubmit={(event) => void createEvent(event)}>
           <input placeholder="Event title" value={eventTitle} onChange={(event) => setEventTitle(event.target.value)} required />
@@ -186,11 +211,11 @@ export function Tasks() {
         </form><div className="tasks-scroll">{events.map((event) => <div className="workspace-entry" key={`${event.calendar}:${event.id}`}>
           <CalendarDays size={17} /><div><strong>{event.summary || "Untitled event"}</strong><small>{event.calendar} · {new Date(event.start?.dateTime ?? event.start?.date ?? "").toLocaleString()}</small></div>
           {event.htmlLink && <a href={event.htmlLink} target="_blank" rel="noreferrer" aria-label="Open event"><ExternalLink size={15} /></a>}
-        </div>)}</div></>}
+        </div>)}{calendarCursor && <button className="workspace-more" disabled={busy} onClick={() => void loadMoreCalendar()}>Load 50 more events</button>}</div></>}
         {tab === "files" && <><div className="tasks-create"><input placeholder="New document or sheet title" value={fileTitle} onChange={(event) => setFileTitle(event.target.value)} />
           <div><button type="button" disabled={busy} onClick={() => void createFile("documents")}>New Doc</button><button type="button" disabled={busy} onClick={() => void createFile("sheets")}>New Sheet</button></div>
         </div><div className="tasks-scroll">{files.map((file) => <div className="workspace-entry" key={file.id}><FileText size={17} /><div><strong>{file.name}</strong><small>{file.mimeType.replace("application/vnd.google-apps.", "Google ")}</small></div>
-          {file.webViewLink && <a href={file.webViewLink} target="_blank" rel="noreferrer" aria-label={`Open ${file.name}`}><ExternalLink size={15} /></a>}</div>)}</div></>}
+          {file.webViewLink && <a href={file.webViewLink} target="_blank" rel="noreferrer" aria-label={`Open ${file.name}`}><ExternalLink size={15} /></a>}</div>)}{fileCursor && <button className="workspace-more" disabled={busy} onClick={() => void loadMoreFiles()}>Load 50 more files</button>}</div></>}
       </>}
     </aside>
   </>;

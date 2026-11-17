@@ -87,16 +87,32 @@ export class GoogleTasks {
     if (!response.ok) { const detail = await response.text(); throw new Error(`Google API request failed (${response.status}): ${detail.slice(0, 200)}`); }
     return response.status === 204 ? undefined as T : await response.json() as T;
   }
+  private decodeCursor(cursor?: string): Record<string, string> | undefined {
+    if (!cursor) return undefined;
+    try { const value = JSON.parse(Buffer.from(cursor, "base64url").toString()) as unknown;
+      if (!value || typeof value !== "object" || Array.isArray(value)) throw new Error();
+      return Object.fromEntries(Object.entries(value).filter((entry): entry is [string, string] => typeof entry[1] === "string"));
+    } catch { throw new Error("Invalid pagination cursor"); }
+  }
+  private encodeCursor(tokens: Record<string, string>) { return Object.keys(tokens).length ? Buffer.from(JSON.stringify(tokens)).toString("base64url") : undefined; }
   async lists(id?: string) {
     const result = await this.request<{ items?: TaskList[] }>("https://tasks.googleapis.com/tasks/v1/users/@me/lists?maxResults=100", undefined, id); return result.items ?? [];
   }
-  async tasks(id: string | undefined, list: string) {
-    const result = await this.request<{ items?: Task[] }>(`https://tasks.googleapis.com/tasks/v1/lists/${encodeURIComponent(list)}/tasks?maxResults=100&showCompleted=true&showHidden=true&showAssigned=true`, undefined, id); return result.items ?? [];
+  async tasks(id: string | undefined, list: string, pageToken?: string) {
+    const query = new URLSearchParams({ maxResults: "50", showCompleted: "true", showHidden: "true", showAssigned: "true", ...(pageToken ? { pageToken } : {}) });
+    const result = await this.request<{ items?: Task[]; nextPageToken?: string }>(`https://tasks.googleapis.com/tasks/v1/lists/${encodeURIComponent(list)}/tasks?${query}`, undefined, id);
+    return { items: result.items ?? [], nextPageToken: result.nextPageToken };
   }
-  async overview() {
+  async overview(cursor?: string) {
     const account = this.account();
-    try { const lists = await this.lists(account.sub); return [{ id: account.sub, email: account.email, lists: await Promise.all(lists.map(async (list) => ({ ...list, tasks: await this.tasks(account.sub, list.id) }))) }]; }
-    catch (error) { return [{ id: account.sub, email: account.email, lists: [], error: (error as Error).message }]; }
+    try {
+      const lists = await this.lists(account.sub); const current = this.decodeCursor(cursor); const next: Record<string, string> = {};
+      const pages = await Promise.all(lists.filter((list) => !current || current[list.id]).map(async (list) => {
+        const page = await this.tasks(account.sub, list.id, current?.[list.id]); if (page.nextPageToken) next[list.id] = page.nextPageToken;
+        return { ...list, tasks: page.items };
+      }));
+      return { accounts: [{ id: account.sub, email: account.email, lists: pages }], cursor: this.encodeCursor(next) };
+    } catch (error) { return { accounts: [{ id: account.sub, email: account.email, lists: [], error: (error as Error).message }], cursor: undefined }; }
   }
   async create(id: string | undefined, list: string, title: string, due?: string) {
     return this.request<Task>(`https://tasks.googleapis.com/tasks/v1/lists/${encodeURIComponent(list)}/tasks`, { method: "POST", body: JSON.stringify({ title, ...(due ? { due: `${due}T00:00:00.000Z` } : {}) }) }, id);
@@ -108,24 +124,26 @@ export class GoogleTasks {
   async calendars() {
     const result = await this.request<{ items?: Calendar[] }>("https://www.googleapis.com/calendar/v3/users/me/calendarList?maxResults=100"); return result.items ?? [];
   }
-  async events(timeMin: string, timeMax: string) {
-    const calendars = (await this.calendars()).filter((calendar) => calendar.selected !== false);
-    const groups = await Promise.all(calendars.map(async (calendar) => {
-      const query = new URLSearchParams({ timeMin, timeMax, singleEvents: "true", orderBy: "startTime", maxResults: "100" });
-      const result = await this.request<{ items?: CalendarEvent[] }>(`https://www.googleapis.com/calendar/v3/calendars/${encodeURIComponent(calendar.id)}/events?${query}`);
+  async events(timeMin: string, timeMax: string, cursor?: string) {
+    const calendars = (await this.calendars()).filter((calendar) => calendar.selected !== false); const current = this.decodeCursor(cursor); const next: Record<string, string> = {};
+    const groups = await Promise.all(calendars.filter((calendar) => !current || current[calendar.id]).map(async (calendar) => {
+      const query = new URLSearchParams({ timeMin, timeMax, singleEvents: "true", orderBy: "startTime", maxResults: "50", ...(current?.[calendar.id] ? { pageToken: current[calendar.id] } : {}) });
+      const result = await this.request<{ items?: CalendarEvent[]; nextPageToken?: string }>(`https://www.googleapis.com/calendar/v3/calendars/${encodeURIComponent(calendar.id)}/events?${query}`);
+      if (result.nextPageToken) next[calendar.id] = result.nextPageToken;
       return (result.items ?? []).map((event) => ({ ...event, calendarId: calendar.id, calendar: calendar.summary }));
     }));
-    return { calendars, events: groups.flat().sort((a, b) => (a.start?.dateTime ?? a.start?.date ?? "").localeCompare(b.start?.dateTime ?? b.start?.date ?? "")) };
+    return { calendars, events: groups.flat().sort((a, b) => (a.start?.dateTime ?? a.start?.date ?? "").localeCompare(b.start?.dateTime ?? b.start?.date ?? "")), cursor: this.encodeCursor(next) };
   }
   async createEvent(input: { calendarId?: string; summary: string; start: string; end: string; allDay?: boolean; description?: string }) {
     const body = { summary: input.summary, description: input.description,
       start: input.allDay ? { date: input.start } : { dateTime: input.start }, end: input.allDay ? { date: input.end } : { dateTime: input.end } };
     return this.request<CalendarEvent>(`https://www.googleapis.com/calendar/v3/calendars/${encodeURIComponent(input.calendarId ?? "primary")}/events`, { method: "POST", body: JSON.stringify(body) });
   }
-  async files(query?: string) {
+  async files(query?: string, pageToken?: string) {
     const q = query?.trim() ? `trashed=false and name contains '${query.trim().replaceAll("'", "\\'")}'` : "trashed=false";
-    const params = new URLSearchParams({ q, pageSize: "100", orderBy: "modifiedTime desc", fields: "files(id,name,mimeType,modifiedTime,webViewLink,iconLink)" });
-    const result = await this.request<{ files?: DriveFile[] }>(`https://www.googleapis.com/drive/v3/files?${params}`); return result.files ?? [];
+    const params = new URLSearchParams({ q, pageSize: "50", orderBy: "modifiedTime desc", fields: "nextPageToken,files(id,name,mimeType,modifiedTime,webViewLink,iconLink)", ...(pageToken ? { pageToken } : {}) });
+    const result = await this.request<{ files?: DriveFile[]; nextPageToken?: string }>(`https://www.googleapis.com/drive/v3/files?${params}`);
+    return { files: result.files ?? [], cursor: result.nextPageToken };
   }
   async createDocument(title: string) {
     return this.request<{ documentId: string; title: string }>("https://docs.googleapis.com/v1/documents", { method: "POST", body: JSON.stringify({ title }) });

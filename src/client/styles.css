@@ -129,6 +129,8 @@ body {
 .workspace-entry strong { display: block; overflow-wrap: anywhere; }
 .workspace-entry small { display: block; color: #6b706a; margin-top: 0.15rem; }
 .workspace-entry a { color: #345b4d; padding: 0.2rem; }
+.workspace-more { width: 100%; border: 1px solid var(--border); border-radius: 0.55rem; background: var(--background); color: #345b4d; padding: 0.55rem; margin-top: 0.8rem; cursor: pointer; font-weight: 650; }
+.workspace-more:disabled { opacity: 0.5; cursor: default; }
 .tasks-create { padding: 0.85rem 1rem; border-bottom: 1px solid var(--border); display: grid; gap: 0.5rem; }
 .tasks-create input, .tasks-create select { min-width: 0; border: 1px solid var(--border); background: var(--background); border-radius: 0.55rem; padding: 0.5rem; font: inherit; font-size: 0.8rem; }
 .tasks-create > div { display: flex; gap: 0.3rem; }

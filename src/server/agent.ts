@@ -47,9 +47,10 @@ export class PiAgUiAdapter {
     if (!this.google) return [];
     const google = this.google;
     return [
-      { name: "task_read", label: "Read Google Tasks", description: "List connected Google accounts, their task lists and tasks. Use this before modifying tasks.",
-        parameters: Type.Object({}),
-        execute: async () => ({ content: [{ type: "text", text: JSON.stringify(await google.overview()) }], details: {} }) },
+      { name: "task_read", label: "Read Google Tasks", description: "Read up to 50 tasks per list. Pass the returned cursor to read the next page.",
+        parameters: Type.Object({ cursor: Type.Optional(Type.String()) }),
+        execute: async (_id, params) => { const p = params as { cursor?: string };
+          return { content: [{ type: "text", text: JSON.stringify(await google.overview(p.cursor)) }], details: {} }; } },
       { name: "task_create", label: "Create Google Task", description: "Create one task in a chosen account and list. Confirm the target account when ambiguous. Due is a YYYY-MM-DD date, not a time.",
         parameters: Type.Object({ account: Type.String(), list: Type.String(), title: Type.String(), due: Type.Optional(Type.String()) }),
         execute: async (_id, params) => {
@@ -68,17 +69,17 @@ export class PiAgUiAdapter {
             { title: p.title, status: p.status, due: p.due })) }], details: {} };
         } },
       { name: "calendar_read", label: "Read Google Calendar", description: "Read events across the connected account's selected calendars in an RFC3339 time range.",
-        parameters: Type.Object({ timeMin: Type.String(), timeMax: Type.String() }),
-        execute: async (_id, params) => { const p = params as { timeMin: string; timeMax: string };
-          return { content: [{ type: "text", text: JSON.stringify(await google.events(p.timeMin, p.timeMax)) }], details: {} }; } },
+        parameters: Type.Object({ timeMin: Type.String(), timeMax: Type.String(), cursor: Type.Optional(Type.String()) }),
+        execute: async (_id, params) => { const p = params as { timeMin: string; timeMax: string; cursor?: string };
+          return { content: [{ type: "text", text: JSON.stringify(await google.events(p.timeMin, p.timeMax, p.cursor)) }], details: {} }; } },
       { name: "calendar_create", label: "Create Calendar Event", description: "Create one explicitly requested calendar event. Timed values must be RFC3339 with an offset; all-day values are dates and end is exclusive.",
         parameters: Type.Object({ summary: Type.String(), start: Type.String(), end: Type.String(), allDay: Type.Optional(Type.Boolean()), description: Type.Optional(Type.String()) }),
         execute: async (_id, params) => { const p = params as { summary: string; start: string; end: string; allDay?: boolean; description?: string };
           return { content: [{ type: "text", text: JSON.stringify(await google.createEvent(p)) }], details: {} }; } },
       { name: "drive_search", label: "Search Google Drive", description: "List or search files authorized for this app. It cannot search the entire Drive unless the user explicitly authorized files to the app.",
-        parameters: Type.Object({ query: Type.Optional(Type.String()) }),
-        execute: async (_id, params) => { const p = params as { query?: string };
-          return { content: [{ type: "text", text: JSON.stringify(await google.files(p.query)) }], details: {} }; } },
+        parameters: Type.Object({ query: Type.Optional(Type.String()), cursor: Type.Optional(Type.String()) }),
+        execute: async (_id, params) => { const p = params as { query?: string; cursor?: string };
+          return { content: [{ type: "text", text: JSON.stringify(await google.files(p.query, p.cursor)) }], details: {} }; } },
       { name: "document_read", label: "Read Google Doc", description: "Read text from an app-authorized Google Doc by file ID.", parameters: Type.Object({ id: Type.String() }),
         execute: async (_id, params) => { const p = params as { id: string }; return { content: [{ type: "text", text: JSON.stringify(await google.readDocument(p.id)) }], details: {} }; } },
       { name: "document_create", label: "Create Google Doc", description: "Create one empty Google Doc after an explicit request.", parameters: Type.Object({ title: Type.String() }),
